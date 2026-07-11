@@ -40,17 +40,11 @@ class Host:
     def getHostname() -> str:
         """@param: none
         @return: hostname string
-        @desc: retrieves system hostname via subprocess"""
-        subprocess = __import__("subprocess")
+        @desc: retrieves system hostname"""
+        import platform
         try:
-            result = subprocess.run(
-                ["hostname"],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            return result.stdout.strip()
-        except subprocess.CalledProcessError as exc:
+            return platform.node()
+        except Exception as exc:
             log_exception(logger, exc, "Hostname retrieval")
             return "Unknown"
 

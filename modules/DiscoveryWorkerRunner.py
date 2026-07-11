@@ -19,7 +19,6 @@ def run_arp_scan(iface=None):
     @return: raw arp-scan output string
     @desc: executes arp-scan command with sudo privileges"""
     cmd = [
-        "sudo",
         "arp-scan",
         "--localnet",
         "--plain",
@@ -27,7 +26,6 @@ def run_arp_scan(iface=None):
     ]
     if iface:
         cmd = [
-            "sudo",
             "arp-scan",
             "-I",
             iface,

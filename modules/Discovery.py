@@ -6,7 +6,6 @@ Description: Network discovery module using arp-scan for host detection
 """
 import json
 import subprocess
-import sys
 from pathlib import Path
 from modules.Logger import setup_logger, log_exception
 
@@ -18,15 +17,15 @@ class Discovery:
         """@param: none
         @return: none
         @desc: initializes Discovery with helper script path"""
-        self.helper = Path(__file__).with_name("DiscoveryWorkerRunner.py")
+        self.helper = Path(__file__).with_name("arp-scan-helper")
 
     def scan(self):
         """@param: none
         @return: list of discovered host dictionaries
-        @desc: runs arp-scan via helper script with elevated privileges"""
+        @desc: runs arp-scan via pkexec and helper script (polkit handles auth graphically)"""
         try:
             result = subprocess.run(
-                ["pkexec", sys.executable, str(self.helper)],
+                ["pkexec", str(self.helper)],
                 capture_output=True,
                 text=True,
                 check=True,

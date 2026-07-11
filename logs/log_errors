@@ -14,3 +14,49 @@
 2026-07-11 20:16:43 | INFO     | OpenFileSync | main.py:245 | API server started on port 8010
 2026-07-11 20:16:56 | INFO     | OpenFileSync | main.py:239 | Application starting
 2026-07-11 20:16:56 | INFO     | OpenFileSync | main.py:245 | API server started on port 8010
+2026-07-11 20:22:27 | INFO     | OpenFileSync | main.py:239 | Application starting
+2026-07-11 20:22:27 | INFO     | OpenFileSync | main.py:245 | API server started on port 8010
+2026-07-11 20:22:32 | ERROR    | OpenFileSync | Logger.py:54 | [Network discovery scan] CalledProcessError: Command '['pkexec', '/home/nfire07/development/OpenFileSync/.venv/bin/python', '/home/nfire07/development/OpenFileSync/modules/DiscoveryWorkerRunner.py']' returned non-zero exit status 126.
+Traceback (most recent call last):
+  File "/home/nfire07/development/OpenFileSync/modules/Discovery.py", line 28, in scan
+    result = subprocess.run(
+        ["pkexec", sys.executable, str(self.helper)],
+    ...<2 lines>...
+        check=True,
+    )
+  File "/usr/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['pkexec', '/home/nfire07/development/OpenFileSync/.venv/bin/python', '/home/nfire07/development/OpenFileSync/modules/DiscoveryWorkerRunner.py']' returned non-zero exit status 126.
+2026-07-11 20:22:47 | ERROR    | OpenFileSync | Logger.py:54 | [Network discovery scan] CalledProcessError: Command '['pkexec', '/home/nfire07/development/OpenFileSync/.venv/bin/python', '/home/nfire07/development/OpenFileSync/modules/DiscoveryWorkerRunner.py']' returned non-zero exit status 1.
+Traceback (most recent call last):
+  File "/home/nfire07/development/OpenFileSync/modules/Discovery.py", line 28, in scan
+    result = subprocess.run(
+        ["pkexec", sys.executable, str(self.helper)],
+    ...<2 lines>...
+        check=True,
+    )
+  File "/usr/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['pkexec', '/home/nfire07/development/OpenFileSync/.venv/bin/python', '/home/nfire07/development/OpenFileSync/modules/DiscoveryWorkerRunner.py']' returned non-zero exit status 1.
+2026-07-11 20:24:06 | INFO     | OpenFileSync | main.py:239 | Application starting
+2026-07-11 20:24:06 | INFO     | OpenFileSync | main.py:245 | API server started on port 8010
+2026-07-11 20:24:17 | ERROR    | OpenFileSync | Logger.py:54 | [Network discovery scan] CalledProcessError: Command '['sudo', '/home/nfire07/development/OpenFileSync/.venv/bin/python', '/home/nfire07/development/OpenFileSync/modules/DiscoveryWorkerRunner.py']' returned non-zero exit status 1.
+Traceback (most recent call last):
+  File "/home/nfire07/development/OpenFileSync/modules/Discovery.py", line 28, in scan
+    result = subprocess.run(
+        ["sudo", sys.executable, str(self.helper)],
+    ...<2 lines>...
+        check=True,
+    )
+  File "/usr/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['sudo', '/home/nfire07/development/OpenFileSync/.venv/bin/python', '/home/nfire07/development/OpenFileSync/modules/DiscoveryWorkerRunner.py']' returned non-zero exit status 1.
+2026-07-11 20:29:59 | INFO     | OpenFileSync | main.py:239 | Application starting
+2026-07-11 20:29:59 | INFO     | OpenFileSync | main.py:245 | API server started on port 8010
+2026-07-11 20:30:38 | INFO     | OpenFileSync | main.py:239 | Application starting
+2026-07-11 20:30:38 | INFO     | OpenFileSync | main.py:245 | API server started on port 8010
+2026-07-11 20:31:11 | INFO     | OpenFileSync | main.py:239 | Application starting
+2026-07-11 20:31:11 | INFO     | OpenFileSync | main.py:245 | API server started on port 8010

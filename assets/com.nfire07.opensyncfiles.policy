@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+
+  <vendor>OpenFileSync</vendor>
+  <vendor_url>https://github.com/nfire07/OpenFileSync</vendor_url>
+
+  <action id="com.nfire07.opensyncfiles.arp-scan">
+    <description>Run ARP scan for network host discovery</description>
+    <message>Authentication is required to scan the local network</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/home/nfire07/development/OpenFileSync/modules/arp-scan-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+
+</policyconfig>
