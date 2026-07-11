@@ -1,2 +1,3 @@
 #!/bin/bash
-exec /usr/bin/python3 /home/nfire07/development/OpenFileSync/modules/DiscoveryWorkerRunner.py
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+exec /usr/bin/python3 "$SCRIPT_DIR/DiscoveryWorkerRunner.py"
