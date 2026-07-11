@@ -1,0 +1,70 @@
+Screen {
+}
+
+#host-info {
+    width: 100%;
+    height: auto;
+    content-align: center middle;
+    border: round #fefefe;
+}
+
+#host-info Static {
+    text-align: center;
+}
+
+#main {
+    width: 100%;
+    height: 1fr;
+}
+
+#main.row {
+    layout: horizontal;
+}
+
+#main.column {
+    layout: vertical;
+}
+
+#available_hosts {
+    border: round $primary;
+    padding: 1;
+}
+
+#filesystem {
+    border: round $primary;
+    padding: 1;
+}
+
+#main.row #available_hosts {
+    width: 30%;
+    height: 100%;
+}
+
+#main.row #filesystem {
+    width: 70%;
+    height: 100%;
+}
+
+#main.column #available_hosts,
+#main.column #filesystem {
+    width: 100%;
+    height: auto;
+}
+
+#hosts-scroll {
+    width: 100%;
+    height: 100%;
+    layout:vertical;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+HostItem {
+    height: auto;
+    width: auto;
+    text-wrap: nowrap;
+}
+
+HostItem Static {
+    text-wrap: nowrap;
+}
