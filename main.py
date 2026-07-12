@@ -652,7 +652,7 @@ class OpenFileSyncApp(App):
                 "role": "target",
             }
             fs = self.query_one("#fs-panel", FilesystemPanel)
-            fs.connect(session_id, from_ip)
+            fs.connect(session_id, "127.0.0.1")
 
     def action_kill_connection(self) -> None:
         """@param: none
