@@ -96,22 +96,20 @@ class OtpModal(ModalScreen):
     def compose(self) -> ComposeResult:
         """@param: none
         @return: ComposeResult with modal widgets
-        @desc: composes the OTP modal with code display and action buttons"""
+        @desc: composes the OTP modal with code display and cancel button"""
         with Container(id="otp-dialog"):
             yield Static("Connection Request", id="otp-title")
             yield Static(f"  {self.otp:02d}  ", id="otp-code")
             yield Static(f"from {self.from_ip}", id="otp-from")
             with Container(id="otp-buttons"):
-                yield Button("Accept", variant="success", id="btn-accept")
-                yield Button("Reject", variant="error", id="btn-reject")
+                yield Button("Cancel", variant="error", id="btn-cancel")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """@param event: Button.Pressed event from the modal
         @return: none
-        @desc: handles accept/reject button press"""
-        if event.button.id == "btn-reject":
-            self._cancel_session()
-        self.dismiss(result=event.button.id)
+        @desc: handles cancel button press"""
+        self._cancel_session()
+        self.dismiss(result="cancelled")
 
     def _cancel_session(self):
         """@param: none
@@ -223,6 +221,9 @@ class ConnectOtpModal(ModalScreen):
         result = self.network.sendOtp(self.target_ip, self.session_id, int(otp_text))
         if result.get("verified"):
             self.dismiss(result="verified")
+        elif "session not found" in (result.get("error") or "") or "session already" in (result.get("error") or ""):
+            self.query_one("#connect-status", Static).update("Session cancelled by remote host")
+            self.dismiss(result="cancelled")
         else:
             self.query_one("#connect-status", Static).update(result.get("error", "Verification failed"))
 
@@ -626,17 +627,8 @@ class OpenFileSyncApp(App):
     def _on_otp_result(self, result: str):
         """@param result: modal dismiss result string
         @return: none
-        @desc: handles OTP modal result and activates filesystem panel for target"""
-        if result == "btn-accept":
-            session_id = self._last_otp_session_id
-            from_ip = self._last_otp_from_ip
-            self.active_session = {
-                "session_id": session_id,
-                "remote_ip": from_ip,
-                "role": "target",
-            }
-            fs = self.query_one("#fs-panel", FilesystemPanel)
-            fs.connect(session_id, from_ip)
+        @desc: handles OTP modal result (only cancel possible)"""
+        pass
 
     def action_kill_connection(self) -> None:
         """@param: none
