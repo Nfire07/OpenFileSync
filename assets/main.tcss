@@ -63,6 +63,11 @@ HostItem {
     height: auto;
     width: auto;
     text-wrap: nowrap;
+    cursor: pointer;
+}
+
+HostItem:hover {
+    background: $accent 15%;
 }
 
 HostItem Static {

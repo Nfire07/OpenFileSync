@@ -125,6 +125,82 @@ class OtpModal(ModalScreen):
             pass
 
 
+class ConnectOtpModal(ModalScreen):
+    CSS = """
+    ConnectOtpModal {
+        align: center middle;
+    }
+    #connect-dialog {
+        width: 50;
+        height: auto;
+        padding: 1 2;
+        border: thick $success;
+        background: $surface;
+    }
+    #connect-title {
+        text-align: center;
+        width: 100%;
+        text-style: bold;
+        color: $text;
+        margin-bottom: 1;
+    }
+    #connect-code {
+        text-align: center;
+        width: 100%;
+        height: 3;
+        content-align: center middle;
+        text-style: bold;
+        color: $accent;
+        margin-bottom: 1;
+    }
+    #connect-target {
+        text-align: center;
+        width: 100%;
+        color: $text-muted;
+        margin-bottom: 1;
+    }
+    #connect-hint {
+        text-align: center;
+        width: 100%;
+        color: $text-muted;
+        margin-bottom: 1;
+    }
+    #connect-close {
+        width: 100%;
+        align: center middle;
+    }
+    """
+
+    def __init__(self, session_id: str, otp: int, target_ip: str, **kwargs):
+        """@param session_id: unique session identifier
+        @param otp: the OTP code to display
+        @param target_ip: IP address of the target host
+        @return: none
+        @desc: initializes ConnectOtpModal with outgoing connection data"""
+        super().__init__(**kwargs)
+        self.session_id = session_id
+        self.otp = otp
+        self.target_ip = target_ip
+
+    def compose(self) -> ComposeResult:
+        """@param: none
+        @return: ComposeResult with modal widgets
+        @desc: composes the outgoing OTP modal with code and instructions"""
+        with Container(id="connect-dialog"):
+            yield Static("Connecting...", id="connect-title")
+            yield Static(f"  {self.otp:02d}  ", id="connect-code")
+            yield Static(f"to {self.target_ip}", id="connect-target")
+            yield Static("Share this code with the remote host", id="connect-hint")
+            with Container(id="connect-close"):
+                yield Button("Close", variant="default", id="btn-close")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """@param event: Button.Pressed event from the modal
+        @return: none
+        @desc: dismisses the modal on button press"""
+        self.dismiss()
+
+
 class HostItem(Static):
     def __init__(self, client_ip: str, host_data: dict, network: Network, **kwargs):
         """@param client_ip: local client IP address string
@@ -137,6 +213,7 @@ class HostItem(Static):
         self.host_data = host_data
         self.network = network
         self.api_status = "loading"
+        self.api_base = f"http://127.0.0.1:8010"
 
     def on_mount(self) -> None:
         """@param: none
@@ -177,6 +254,31 @@ class HostItem(Static):
         content.append(f"[{ipv6}] ", style="yellow")
         content.append(f"{hostname} ", style="white")
         self.update(content)
+
+    def on_click(self) -> None:
+        """@param: none
+        @return: none
+        @desc: initiates connection to this host via API and shows OTP modal"""
+        if self.api_status != "active":
+            return
+        target_ip = (self.host_data.get("ipv4", "") or "").strip()
+        if not target_ip:
+            return
+        try:
+            resp = requests.post(
+                f"{self.api_base}/connect",
+                json={"target_ip": target_ip, "from_ip": self.client_ip},
+                timeout=2,
+            )
+            data = resp.json()
+            if "session_id" in data:
+                self.app.push_screen(ConnectOtpModal(
+                    session_id=data["session_id"],
+                    otp=data["otp"],
+                    target_ip=target_ip,
+                ))
+        except requests.RequestException:
+            pass
 
 
 class AvailableHosts(Vertical):
