@@ -321,11 +321,12 @@ class HostItem(Static):
 
 
 class DirectoryEntry(Static):
-    def __init__(self, entry: dict, network: Network, session_id: str, remote_ip: str, **kwargs):
+    def __init__(self, entry: dict, network: Network, session_id: str, remote_ip: str, panel, **kwargs):
         """@param entry: dict with name, path, type, and optional children
         @param network: Network instance for API calls
         @param session_id: verified session identifier
         @param remote_ip: IP address of the remote host
+        @param panel: reference to the parent FilesystemPanel
         @return: none
         @desc: initializes a directory or file entry for the filesystem panel"""
         super().__init__(**kwargs)
@@ -333,6 +334,7 @@ class DirectoryEntry(Static):
         self.network = network
         self.session_id = session_id
         self.remote_ip = remote_ip
+        self.panel = panel
         self.is_dir = entry.get("type") == "directory"
 
     def on_mount(self) -> None:
@@ -355,9 +357,7 @@ class DirectoryEntry(Static):
         path = self.entry.get("path")
         if not path:
             return
-        panel = self.parent.parent
-        if isinstance(panel, FilesystemPanel):
-            panel.load_tree(path)
+        self.panel.load_tree(path)
 
 
 class FilesystemPanel(Vertical):
@@ -462,11 +462,11 @@ class FilesystemPanel(Vertical):
         files = [c for c in children if c.get("type") == "file"]
         if self.current_path and self.current_path != str(Path.home()):
             back = {"name": "..", "path": str(Path(self.current_path).parent), "type": "directory"}
-            self._entries.mount(DirectoryEntry(back, self.network, self.session_id, self.remote_ip))
+            self._entries.mount(DirectoryEntry(back, self.network, self.session_id, self.remote_ip, self))
         for entry in dirs:
-            self._entries.mount(DirectoryEntry(entry, self.network, self.session_id, self.remote_ip))
+            self._entries.mount(DirectoryEntry(entry, self.network, self.session_id, self.remote_ip, self))
         for entry in files:
-            self._entries.mount(DirectoryEntry(entry, self.network, self.session_id, self.remote_ip))
+            self._entries.mount(DirectoryEntry(entry, self.network, self.session_id, self.remote_ip, self))
 
 
 class AvailableHosts(Vertical):
