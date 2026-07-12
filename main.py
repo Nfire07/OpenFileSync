@@ -455,11 +455,13 @@ class OpenFileSyncApp(App):
     def _poll_pending_connect(self) -> None:
         """@param: none
         @return: none
-        @desc: polls API for pending connection requests and shows OTP modal"""
+        @desc: polls API for pending connection requests directed to this host"""
         try:
             resp = requests.get(f"{self.api_base}/pending-connect", timeout=1.5)
             data = resp.json()
             if not data or "session_id" not in data:
+                return
+            if data.get("target_ip") != self.network_info["ip"]:
                 return
             sid = data["session_id"]
             if sid in self._pending_shown:
