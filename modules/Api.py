@@ -1,6 +1,6 @@
 """
 Author: Mele Nicolo' Emanuele
-Date: July 11, 2026
+Date: July 12, 2026
 License: MIT
 Description: FastAPI server for OpenFileSync status endpoint
 """
@@ -11,6 +11,7 @@ import uvicorn
 import random
 import uuid
 import time
+import base64
 
 
 class ConnectRequest(BaseModel):
@@ -32,6 +33,11 @@ class TreeRequest(BaseModel):
     path: str = None
     depth: int = 1
     hidden: bool = False
+
+
+class DownloadRequest(BaseModel):
+    session_id: str
+    path: str
 
 
 class DisconnectRequest(BaseModel):
@@ -159,6 +165,27 @@ class OpenFileSyncApi:
                         "target_ip": session["target_ip"],
                     })
             return result
+
+        @self.app.post("/download")
+        def download(req: DownloadRequest):
+            """@param req: DownloadRequest with session_id and file path
+            @return: dict with base64-encoded file content or error
+            @desc: serves file content after validating session"""
+            session = self.sessions.get(req.session_id)
+            if not session:
+                return {"error": "session not found"}
+            if session["status"] != "verified":
+                return {"error": "session not verified"}
+            file_path = Path(req.path)
+            if not file_path.is_file():
+                return {"error": "not a valid file"}
+            try:
+                content = file_path.read_bytes()
+                return {"content": base64.b64encode(content).decode("ascii"), "name": file_path.name}
+            except PermissionError:
+                return {"error": "permission denied"}
+            except Exception as e:
+                return {"error": str(e)}
 
         @self.app.post("/disconnect")
         def disconnect(req: DisconnectRequest):

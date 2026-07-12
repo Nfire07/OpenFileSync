@@ -249,6 +249,98 @@ class ConnectOtpModal(ModalScreen):
         self.network.cancelSession(self.target_ip, self.session_id)
 
 
+class SaveFileModal(ModalScreen):
+    CSS = """
+    SaveFileModal {
+        align: center middle;
+    }
+    #save-dialog {
+        width: 60;
+        height: auto;
+        padding: 1 2;
+        border: thick $success;
+        background: $surface;
+    }
+    #save-title {
+        text-align: center;
+        width: 100%;
+        text-style: bold;
+        color: $text;
+        margin-bottom: 1;
+    }
+    #save-filename {
+        text-align: center;
+        width: 100%;
+        color: $text-muted;
+        margin-bottom: 1;
+    }
+    #save-path {
+        width: 100%;
+        margin-bottom: 1;
+    }
+    #save-buttons {
+        width: 100%;
+        layout: horizontal;
+        align: center middle;
+    }
+    #save-buttons Button {
+        margin: 0 1;
+    }
+    #save-status {
+        text-align: center;
+        width: 100%;
+        color: $error;
+        margin-top: 0;
+    }
+    """
+
+    def __init__(self, file_name: str, **kwargs):
+        """@param file_name: name of the file being saved
+        @return: none
+        @desc: initializes SaveFileModal with file name and default save path"""
+        super().__init__(**kwargs)
+        self.file_name = file_name
+        self.default_path = str(Path.home() / file_name)
+
+    def compose(self) -> ComposeResult:
+        """@param: none
+        @return: ComposeResult with modal widgets
+        @desc: composes the save file modal with path input and buttons"""
+        with Container(id="save-dialog"):
+            yield Static("Save File", id="save-title")
+            yield Static(f"Downloading: {self.file_name}", id="save-filename")
+            yield Input(value=self.default_path, id="save-path")
+            yield Static("", id="save-status")
+            with Container(id="save-buttons"):
+                yield Button("Save", variant="success", id="btn-save")
+                yield Button("Cancel", variant="error", id="btn-cancel")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """@param event: Button.Pressed event from the modal
+        @return: none
+        @desc: handles save/cancel button press"""
+        if event.button.id == "btn-cancel":
+            self.dismiss(result=None)
+        elif event.button.id == "btn-save":
+            self._save_file()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        """@param event: Input.Submitted event from the path input
+        @return: none
+        @desc: handles enter key press on the path input"""
+        self._save_file()
+
+    def _save_file(self):
+        """@param: none
+        @return: none
+        @desc: validates path and dismisses with the save path"""
+        path = self.query_one("#save-path", Input).value.strip()
+        if not path:
+            self.query_one("#save-status", Static).update("Please enter a valid path")
+            return
+        self.dismiss(result=path)
+
+
 class HostItem(Static):
     def __init__(self, client_ip: str, host_data: dict, network: Network, **kwargs):
         """@param client_ip: local client IP address string
@@ -370,13 +462,33 @@ class DirectoryEntry(Static):
     def on_click(self) -> None:
         """@param: none
         @return: none
-        @desc: navigates into directory when clicked"""
-        if not self.is_dir:
-            return
+        @desc: navigates into directory or opens save modal for files"""
         path = self.entry.get("path")
         if not path:
             return
-        self.panel.load_tree(path)
+        if self.is_dir:
+            self.panel.load_tree(path)
+        else:
+            modal = SaveFileModal(file_name=self.entry.get("name", ""))
+            self.app.push_screen(modal, self._on_save_result)
+
+    def _on_save_result(self, save_path: str):
+        """@param save_path: destination path from the modal, or None if cancelled
+        @return: none
+        @desc: downloads file from remote host and saves to the given path"""
+        if save_path is None:
+            return
+        file_path = self.entry.get("path")
+        if not file_path:
+            return
+        result = self.network.downloadFile(self.remote_ip, self.session_id, file_path)
+        if "error" in result:
+            return
+        import base64
+        content = base64.b64decode(result["content"])
+        dest = Path(save_path)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(content)
 
 
 class FilesystemPanel(Vertical):

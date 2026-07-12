@@ -131,6 +131,20 @@ class Network:
         except requests.RequestException:
             return {"error": "connection error"}
 
+    def downloadFile(self, host_ip: str, session_id: str, file_path: str):
+        """@param host_ip: IP address of the host to download from
+        @param session_id: verified session identifier
+        @param file_path: full path of the file to download
+        @return: dict with base64-encoded content or error
+        @desc: downloads file content from remote host via API"""
+        url = f"http://{host_ip}:{self.app_port}/download"
+        try:
+            resp = requests.post(url, json={"session_id": session_id, "path": file_path}, timeout=self.timeout)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException:
+            return {"error": "connection error"}
+
     def disconnect(self, host_ip: str, session_id: str):
         """@param host_ip: IP address of the host owning the session
         @param session_id: session identifier to destroy
