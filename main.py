@@ -5,7 +5,7 @@ License: MIT
 Description: TUI application for OpenFileSync with network host discovery and status monitoring
 """
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Static, Button
+from textual.widgets import Header, Footer, Static, Button, Input
 from textual.screen import ModalScreen
 from textual.containers import Container, HorizontalScroll, Vertical
 from textual.binding import Binding
@@ -144,15 +144,6 @@ class ConnectOtpModal(ModalScreen):
         color: $text;
         margin-bottom: 1;
     }
-    #connect-code {
-        text-align: center;
-        width: 100%;
-        height: 3;
-        content-align: center middle;
-        text-style: bold;
-        color: $accent;
-        margin-bottom: 1;
-    }
     #connect-target {
         text-align: center;
         width: 100%;
@@ -165,40 +156,99 @@ class ConnectOtpModal(ModalScreen):
         color: $text-muted;
         margin-bottom: 1;
     }
-    #connect-close {
+    #otp-input {
         width: 100%;
+        margin-bottom: 1;
+    }
+    #connect-buttons {
+        width: 100%;
+        layout: horizontal;
         align: center middle;
+    }
+    #connect-buttons Button {
+        margin: 0 1;
+    }
+    #connect-status {
+        text-align: center;
+        width: 100%;
+        color: $error;
+        margin-top: 0;
     }
     """
 
-    def __init__(self, session_id: str, otp: int, target_ip: str, **kwargs):
+    def __init__(self, session_id: str, target_ip: str, **kwargs):
         """@param session_id: unique session identifier
-        @param otp: the OTP code to display
         @param target_ip: IP address of the target host
         @return: none
-        @desc: initializes ConnectOtpModal with outgoing connection data"""
+        @desc: initializes ConnectOtpModal with session and target data"""
         super().__init__(**kwargs)
         self.session_id = session_id
-        self.otp = otp
         self.target_ip = target_ip
 
     def compose(self) -> ComposeResult:
         """@param: none
         @return: ComposeResult with modal widgets
-        @desc: composes the outgoing OTP modal with code and instructions"""
+        @desc: composes the OTP input modal with text field and action buttons"""
         with Container(id="connect-dialog"):
-            yield Static("Connecting...", id="connect-title")
-            yield Static(f"  {self.otp:02d}  ", id="connect-code")
+            yield Static("Connection Request", id="connect-title")
             yield Static(f"to {self.target_ip}", id="connect-target")
-            yield Static("Share this code with the remote host", id="connect-hint")
-            with Container(id="connect-close"):
-                yield Button("Close", variant="default", id="btn-close")
+            yield Static("Enter the OTP shown on the remote host", id="connect-hint")
+            yield Input(placeholder="Enter OTP...", id="otp-input", max_length=3)
+            yield Static("", id="connect-status")
+            with Container(id="connect-buttons"):
+                yield Button("Submit", variant="success", id="btn-submit")
+                yield Button("Cancel", variant="error", id="btn-cancel")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """@param event: Button.Pressed event from the modal
         @return: none
-        @desc: dismisses the modal on button press"""
-        self.dismiss()
+        @desc: handles submit/cancel button press"""
+        if event.button.id == "btn-cancel":
+            self._cancel_session()
+            self.dismiss(result="cancelled")
+        elif event.button.id == "btn-submit":
+            self._submit_otp()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        """@param event: Input.Submitted event from the text field
+        @return: none
+        @desc: handles enter key press on the OTP input"""
+        self._submit_otp()
+
+    def _submit_otp(self):
+        """@param: none
+        @return: none
+        @desc: validates and sends OTP to API for verification"""
+        otp_text = self.query_one("#otp-input", Input).value.strip()
+        if not otp_text or not otp_text.isdigit():
+            self.query_one("#connect-status", Static).update("Please enter a valid number")
+            return
+        try:
+            resp = requests.post(
+                f"http://127.0.0.1:8010/send-otp",
+                json={"session_id": self.session_id, "otp": int(otp_text)},
+                timeout=2,
+            )
+            data = resp.json()
+            if data.get("verified"):
+                self.dismiss(result="verified")
+            else:
+                self.query_one("#connect-status", Static).update(data.get("error", "Verification failed"))
+        except requests.RequestException:
+            self.query_one("#connect-status", Static).update("Connection error")
+
+    def _cancel_session(self):
+        """@param: none
+        @return: none
+        @desc: sends cancel request to API for this session"""
+        try:
+            requests.post(
+                "http://127.0.0.1:8010/cancel",
+                json={"session_id": self.session_id},
+                timeout=2,
+            )
+        except requests.RequestException:
+            pass
 
 
 class HostItem(Static):
@@ -258,7 +308,7 @@ class HostItem(Static):
     def on_click(self) -> None:
         """@param: none
         @return: none
-        @desc: initiates connection to this host via API and shows OTP modal"""
+        @desc: initiates connection to this host via API and shows OTP input modal"""
         if self.api_status != "active":
             return
         target_ip = (self.host_data.get("ipv4", "") or "").strip()
@@ -274,7 +324,6 @@ class HostItem(Static):
             if "session_id" in data:
                 self.app.push_screen(ConnectOtpModal(
                     session_id=data["session_id"],
-                    otp=data["otp"],
                     target_ip=target_ip,
                 ))
         except requests.RequestException:
