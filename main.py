@@ -398,6 +398,7 @@ class FilesystemPanel(Vertical):
         self.session_id = None
         self.remote_ip = None
         self.current_path = None
+        self._show_hidden = False
         self._header = Static("Not connected", id="fs-header")
         self._entries = VerticalScroll(id="fs-entries")
 
@@ -425,8 +426,18 @@ class FilesystemPanel(Vertical):
         self.remote_ip = None
         self.current_path = None
         self._header.update("Not connected")
+        self._show_hidden = False
         for child in list(self._entries.children):
             child.remove()
+
+    def action_toggle_hidden(self) -> None:
+        """@param: none
+        @return: none
+        @desc: toggles hidden files visibility and reloads current directory"""
+        if not self.session_id:
+            return
+        self._show_hidden = not self._show_hidden
+        self.load_tree(self.current_path)
 
     def load_tree(self, path: str = None):
         """@param path: directory path to load, or None for home
@@ -437,7 +448,7 @@ class FilesystemPanel(Vertical):
         for child in list(self._entries.children):
             child.remove()
         self._header.update(f"Loading {path or '~'}...")
-        data = self.network.getTree(self.remote_ip, self.session_id, path)
+        data = self.network.getTree(self.remote_ip, self.session_id, path, hidden=self._show_hidden)
         self._render_tree(data, path)
 
     def _render_tree(self, data: dict, path: str = None):
@@ -450,7 +461,8 @@ class FilesystemPanel(Vertical):
             return
         display_path = data.get("path", path or "~")
         self.current_path = display_path
-        self._header.update(f" {display_path}")
+        hidden_indicator = " [hidden]" if self._show_hidden else ""
+        self._header.update(f" {display_path}{hidden_indicator}")
         children = data.get("children", [])
         dirs = [c for c in children if c.get("type") == "directory"]
         files = [c for c in children if c.get("type") == "file"]
@@ -521,6 +533,7 @@ class OpenFileSyncApp(App):
         Binding("q", "quit", "Quit Application"),
         Binding("s", "scan", "Scan Network"),
         Binding("k", "kill_connection", "Disconnect"),
+        Binding("a", "toggle_hidden", "Toggle Hidden Files"),
     ]
 
     host = Host.create()
@@ -645,6 +658,13 @@ class OpenFileSyncApp(App):
         @return: none
         @desc: triggers network scan to discover available hosts"""
         self.available_hosts.start_scan()
+
+    def action_toggle_hidden(self) -> None:
+        """@param: none
+        @return: none
+        @desc: forwards hidden files toggle to filesystem panel"""
+        fs = self.query_one("#fs-panel", FilesystemPanel)
+        fs.action_toggle_hidden()
 
     def on_resize(self, event) -> None:
         """@param event: resize event from Textual
