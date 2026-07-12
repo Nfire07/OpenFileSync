@@ -112,6 +112,38 @@ class Network:
         except requests.RequestException:
             return {}
 
+    def getTree(self, host_ip: str, session_id: str, path: str = None, depth: int = 1, hidden: bool = False):
+        """@param host_ip: IP address of the host to fetch tree from
+        @param session_id: verified session identifier
+        @param path: optional directory path to browse
+        @param depth: tree depth level
+        @param hidden: whether to include hidden files
+        @return: dict representing directory tree or error
+        @desc: fetches remote directory tree via session-authenticated API"""
+        url = f"http://{host_ip}:{self.app_port}/tree"
+        body = {"session_id": session_id, "depth": depth, "hidden": hidden}
+        if path:
+            body["path"] = path
+        try:
+            resp = requests.post(url, json=body, timeout=self.timeout)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException:
+            return {"error": "connection error"}
+
+    def disconnect(self, host_ip: str, session_id: str):
+        """@param host_ip: IP address of the host owning the session
+        @param session_id: session identifier to destroy
+        @return: dict with disconnected key
+        @desc: destroys session on remote host"""
+        url = f"http://{host_ip}:{self.app_port}/disconnect"
+        try:
+            resp = requests.post(url, json={"session_id": session_id}, timeout=self.timeout)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException:
+            return {}
+
     def printNetworkInfo(self):
         """@param: none
         @return: dictionary with network interface information

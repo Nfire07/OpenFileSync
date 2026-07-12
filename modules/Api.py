@@ -4,7 +4,7 @@ Date: July 11, 2026
 License: MIT
 Description: FastAPI server for OpenFileSync status endpoint
 """
-from fastapi import FastAPI, Query
+from fastapi import FastAPI
 from pathlib import Path
 from pydantic import BaseModel
 import uvicorn
@@ -27,6 +27,17 @@ class CancelRequest(BaseModel):
     session_id: str
 
 
+class TreeRequest(BaseModel):
+    session_id: str
+    path: str = None
+    depth: int = 1
+    hidden: bool = False
+
+
+class DisconnectRequest(BaseModel):
+    session_id: str
+
+
 class OpenFileSyncApi:
     def __init__(self):
         """@param: none
@@ -46,16 +57,20 @@ class OpenFileSyncApi:
         def status():
             return {"active": True, "status": "ok"}
 
-        @self.app.get("/tree")
-        def tree(
-            path: str = Query(default=None, description="Base directory path, defaults to user home"),
-            depth: int = Query(default=1, ge=1, le=10, description="Tree depth level"),
-            hidden: bool = Query(default=False, description="Include hidden files and folders"),
-        ):
-            base = Path(path) if path else Path.home()
+        @self.app.post("/tree")
+        def tree(req: TreeRequest):
+            """@param req: TreeRequest with session_id and optional path/depth/hidden
+            @return: dict representing directory tree or error
+            @desc: returns directory tree after validating session"""
+            session = self.sessions.get(req.session_id)
+            if not session:
+                return {"error": "session not found"}
+            if session["status"] != "verified":
+                return {"error": "session not verified"}
+            base = Path(req.path) if req.path else Path.home()
             if not base.is_dir():
                 return {"error": f"'{base}' is not a valid directory"}
-            return self._build_tree(base, depth, hidden)
+            return self._build_tree(base, req.depth, req.hidden)
 
         @self.app.post("/connect")
         def connect(req: ConnectRequest):
@@ -129,6 +144,17 @@ class OpenFileSyncApi:
                         "target_ip": session["target_ip"],
                     }
             return {}
+
+        @self.app.post("/disconnect")
+        def disconnect(req: DisconnectRequest):
+            """@param req: DisconnectRequest with session_id
+            @return: dict with disconnected key
+            @desc: destroys the session and notifies both sides"""
+            session = self.sessions.get(req.session_id)
+            if not session:
+                return {"error": "session not found"}
+            del self.sessions[req.session_id]
+            return {"disconnected": True, "session_id": req.session_id}
 
     def _build_tree(self, directory: Path, depth: int, show_hidden: bool) -> dict:
         """@param directory: root Path to traverse

@@ -7,9 +7,10 @@ Description: TUI application for OpenFileSync with network host discovery and st
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Static, Button, Input
 from textual.screen import ModalScreen
-from textual.containers import Container, HorizontalScroll, Vertical
+from textual.containers import Container, HorizontalScroll, Vertical, VerticalScroll
 from textual.binding import Binding
 from rich.text import Text
+from pathlib import Path
 from ipaddress import ip_address
 from modules.KnownHosts import Host
 from modules.Network import Network
@@ -296,11 +297,176 @@ class HostItem(Static):
             return
         data = self.network.connect(target_ip, self.client_ip)
         if "session_id" in data:
-            self.app.push_screen(ConnectOtpModal(
+            self._last_session_id = data["session_id"]
+            modal = ConnectOtpModal(
                 session_id=data["session_id"],
                 target_ip=target_ip,
                 network=self.network,
-            ))
+            )
+            self.app.push_screen(modal, self._on_connect_result)
+
+    def _on_connect_result(self, result: str):
+        """@param result: modal dismiss result string
+        @return: none
+        @desc: handles connect modal result and activates filesystem panel"""
+        if result == "verified":
+            target_ip = (self.host_data.get("ipv4", "") or "").strip()
+            self.app.active_session = {
+                "session_id": self._last_session_id,
+                "remote_ip": target_ip,
+                "role": "initiator",
+            }
+            fs = self.app.query_one("#fs-panel", FilesystemPanel)
+            fs.connect(self._last_session_id, target_ip)
+
+
+class DirectoryEntry(Static):
+    def __init__(self, entry: dict, network: Network, session_id: str, remote_ip: str, **kwargs):
+        """@param entry: dict with name, path, type, and optional children
+        @param network: Network instance for API calls
+        @param session_id: verified session identifier
+        @param remote_ip: IP address of the remote host
+        @return: none
+        @desc: initializes a directory or file entry for the filesystem panel"""
+        super().__init__(**kwargs)
+        self.entry = entry
+        self.network = network
+        self.session_id = session_id
+        self.remote_ip = remote_ip
+        self.is_dir = entry.get("type") == "directory"
+
+    def on_mount(self) -> None:
+        """@param: none
+        @return: none
+        @desc: renders the entry with icon and name"""
+        icon = "📁" if self.is_dir else "📄"
+        name = self.entry.get("name", "")
+        style = "bold" if self.is_dir else ""
+        content = Text()
+        content.append(f" {icon} {name}", style=style)
+        self.update(content)
+
+    def on_click(self) -> None:
+        """@param: none
+        @return: none
+        @desc: navigates into directory when clicked"""
+        if not self.is_dir:
+            return
+        path = self.entry.get("path")
+        if not path:
+            return
+        panel = self.parent.parent
+        if isinstance(panel, FilesystemPanel):
+            panel.load_tree(path)
+
+
+class FilesystemPanel(Vertical):
+    CSS = """
+    FilesystemPanel {
+        width: 100%;
+        height: 100%;
+    }
+    #fs-header {
+        width: 100%;
+        height: auto;
+        text-style: bold;
+        padding: 0 1;
+        border-bottom: solid $primary;
+    }
+    #fs-entries {
+        width: 100%;
+        height: 1fr;
+        overflow-y: auto;
+    }
+    DirectoryEntry {
+        height: auto;
+        width: 100%;
+        text-wrap: nowrap;
+        padding: 0 1;
+    }
+    DirectoryEntry:hover {
+        background: $accent 15%;
+    }
+    """
+
+    def __init__(self, network: Network, **kwargs):
+        """@param network: Network instance for API calls
+        @return: none
+        @desc: initializes FilesystemPanel with network reference"""
+        super().__init__(**kwargs)
+        self.network = network
+        self.session_id = None
+        self.remote_ip = None
+        self.current_path = None
+        self._header = Static("Not connected", id="fs-header")
+        self._entries = VerticalScroll(id="fs-entries")
+
+    def compose(self) -> ComposeResult:
+        """@param: none
+        @return: ComposeResult with header and entry list
+        @desc: composes the filesystem panel layout"""
+        yield self._header
+        yield self._entries
+
+    def connect(self, session_id: str, remote_ip: str):
+        """@param session_id: verified session identifier
+        @param remote_ip: IP address of the remote host
+        @return: none
+        @desc: activates the panel and loads the root directory"""
+        self.session_id = session_id
+        self.remote_ip = remote_ip
+        self.load_tree(None)
+
+    def disconnect(self):
+        """@param: none
+        @return: none
+        @desc: clears the panel and resets connection state"""
+        self.session_id = None
+        self.remote_ip = None
+        self.current_path = None
+        self._header.update("Not connected")
+        for child in list(self._entries.children):
+            child.remove()
+
+    def load_tree(self, path: str = None):
+        """@param path: directory path to load, or None for home
+        @return: none
+        @desc: fetches and renders directory contents from remote host"""
+        if not self.session_id or not self.remote_ip:
+            return
+        for child in list(self._entries.children):
+            child.remove()
+        self._header.update(f"Loading {path or '~'}...")
+        self.run_worker(self._fetch_tree, path, thread=True)
+
+    def _fetch_tree(self, path: str = None):
+        """@param path: directory path to fetch
+        @return: none
+        @desc: fetches tree data from remote host in background thread"""
+        data = self.network.getTree(self.remote_ip, self.session_id, path)
+        self.app.call_from_thread(self._render_tree, data, path)
+
+    def _render_tree(self, data: dict, path: str = None):
+        """@param data: tree dict from API
+        @param path: the path that was loaded
+        @return: none
+        @desc: renders the fetched tree entries into the scroll container"""
+        if "error" in data:
+            self._header.update(f"Error: {data['error']}")
+            return
+        display_path = data.get("path", path or "~")
+        self.current_path = display_path
+        self._header.update(f" {display_path}")
+        children = data.get("children", [])
+        dirs = [c for c in children if c.get("type") == "directory"]
+        files = [c for c in children if c.get("type") == "file"]
+        if self.current_path and self.current_path != str(Path.home()):
+            back = {"name": "..", "path": str(Path(self.current_path).parent), "type": "directory"}
+            self._entries.mount(DirectoryEntry(back, self.network, self.session_id, self.remote_ip))
+        for entry in dirs:
+            self._entries.mount(DirectoryEntry(entry, self.network, self.session_id, self.remote_ip))
+        for entry in files:
+            self._entries.mount(DirectoryEntry(entry, self.network, self.session_id, self.remote_ip))
 
 
 class AvailableHosts(Vertical):
@@ -359,6 +525,7 @@ class OpenFileSyncApp(App):
     BINDINGS = [
         Binding("q", "quit", "Quit Application"),
         Binding("s", "scan", "Scan Network"),
+        Binding("k", "kill_connection", "Disconnect"),
     ]
 
     host = Host.create()
@@ -367,11 +534,12 @@ class OpenFileSyncApp(App):
         """@param args: positional arguments for App
         @param kwargs: keyword arguments for App
         @return: none
-        @desc: initializes app with network and host state"""
+        @desc: initializes app with network, host state, and connection tracking"""
         self.network = Network()
         self.network_info = self.network.getNetworkInfo()
         self.host_state = {"status": "loading"}
         self._pending_shown = set()
+        self.active_session = None
         super().__init__(*args, **kwargs)
 
     def compose(self) -> ComposeResult:
@@ -387,7 +555,7 @@ class OpenFileSyncApp(App):
             with Container(id="available_hosts"):
                 yield HorizontalScroll(id="hosts-scroll")
             with Container(id="filesystem"):
-                yield Static("Filesystem")
+                yield FilesystemPanel(self.network, id="fs-panel")
 
         yield Footer()
 
@@ -437,12 +605,45 @@ class OpenFileSyncApp(App):
         if sid in self._pending_shown:
             return
         self._pending_shown.add(sid)
-        self.push_screen(OtpModal(
+        self._last_otp_session_id = sid
+        self._last_otp_from_ip = data["from_ip"]
+        modal = OtpModal(
             session_id=sid,
             otp=data["otp"],
             from_ip=data["from_ip"],
             network=self.network,
-        ))
+        )
+        self.push_screen(modal, self._on_otp_result)
+
+    def _on_otp_result(self, result: str):
+        """@param result: modal dismiss result string
+        @return: none
+        @desc: handles OTP modal result and activates filesystem panel for target"""
+        if result == "btn-accept":
+            session_id = self._last_otp_session_id
+            from_ip = self._last_otp_from_ip
+            self.active_session = {
+                "session_id": session_id,
+                "remote_ip": from_ip,
+                "role": "target",
+            }
+            fs = self.query_one("#fs-panel", FilesystemPanel)
+            fs.connect(session_id, from_ip)
+
+    def action_kill_connection(self) -> None:
+        """@param: none
+        @return: none
+        @desc: disconnects active session on both sides and resets filesystem panel"""
+        if not self.active_session:
+            return
+        sid = self.active_session["session_id"]
+        remote_ip = self.active_session["remote_ip"]
+        self.network.disconnect(remote_ip, sid)
+        self.network.cancelSession("127.0.0.1", sid)
+        self.active_session = None
+        self._pending_shown.discard(sid)
+        fs = self.query_one("#fs-panel", FilesystemPanel)
+        fs.disconnect()
 
     def action_scan(self) -> None:
         """@param: none
