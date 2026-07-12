@@ -398,7 +398,6 @@ class FilesystemPanel(Vertical):
         self.session_id = None
         self.remote_ip = None
         self.current_path = None
-        self._pending_path = None
         self._header = Static("Not connected", id="fs-header")
         self._entries = VerticalScroll(id="fs-entries")
 
@@ -432,33 +431,14 @@ class FilesystemPanel(Vertical):
     def load_tree(self, path: str = None):
         """@param path: directory path to load, or None for home
         @return: none
-        @desc: fetches and renders directory contents from remote host"""
+        @desc: fetches remote tree and renders directory contents"""
         if not self.session_id or not self.remote_ip:
             return
         for child in list(self._entries.children):
             child.remove()
         self._header.update(f"Loading {path or '~'}...")
-        self._pending_path = path
-        self.run_worker(self._fetch_tree, path, thread=True, exclusive=True)
-
-    def _fetch_tree(self, path: str = None):
-        """@param path: directory path to fetch
-        @return: dict with tree data from remote host
-        @desc: fetches tree data from remote host in background thread"""
-        return self.network.getTree(self.remote_ip, self.session_id, path)
-
-    def on_worker_state_changed(self, event) -> None:
-        """@param event: Worker.StateChanged event
-        @return: none
-        @desc: handles worker completion and renders tree data"""
-        if event.worker.is_finished:
-            try:
-                data = event.worker.result
-            except Exception:
-                self._header.update("Error fetching tree")
-                return
-            path = self._pending_path
-            self._render_tree(data, path)
+        data = self.network.getTree(self.remote_ip, self.session_id, path)
+        self._render_tree(data, path)
 
     def _render_tree(self, data: dict, path: str = None):
         """@param data: tree dict from API
