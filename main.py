@@ -332,7 +332,10 @@ class HostItem(Static):
                 "remote_ip": target_ip,
                 "role": "initiator",
             }
+            cc = self.app.query_one("#cc-panel", ConnectedClientsPanel)
+            cc.display = False
             fs = self.app.query_one("#fs-panel", FilesystemPanel)
+            fs.display = True
             fs.connect(self._last_session_id, target_ip)
 
 
@@ -465,6 +468,9 @@ class FilesystemPanel(Vertical):
             child.remove()
         self._header.update(f"Loading {path or '~'}...")
         data = self.network.getTree(self.remote_ip, self.session_id, path, hidden=self._show_hidden)
+        if data.get("error") == "session not found":
+            self.handle_session_not_found()
+            return
         self._render_tree(data, path)
 
     def _render_tree(self, data: dict, path: str = None):
@@ -490,6 +496,121 @@ class FilesystemPanel(Vertical):
             self._entries.mount(DirectoryEntry(entry, self.network, self.session_id, self.remote_ip, self))
         for entry in files:
             self._entries.mount(DirectoryEntry(entry, self.network, self.session_id, self.remote_ip, self))
+
+    def handle_session_not_found(self):
+        """@param: none
+        @return: none
+        @desc: clears panel when session is terminated by remote host"""
+        self._header.update("Session terminated by remote host")
+        self.session_id = None
+        self.remote_ip = None
+        self.current_path = None
+        for child in list(self._entries.children):
+            child.remove()
+
+
+class ConnectedClientEntry(Static):
+    def __init__(self, session_id: str, from_ip: str, network: Network, panel, **kwargs):
+        """@param session_id: session identifier to disconnect
+        @param from_ip: IP address of the connected client
+        @param network: Network instance for API calls
+        @param panel: reference to the parent ConnectedClientsPanel
+        @return: none
+        @desc: initializes a connected client entry with disconnect button"""
+        super().__init__(**kwargs)
+        self.session_id = session_id
+        self.from_ip = from_ip
+        self.network = network
+        self.panel = panel
+
+    def on_mount(self) -> None:
+        """@param: none
+        @return: none
+        @desc: renders client entry with IP and disconnect button"""
+        content = Text()
+        content.append(f"  {self.from_ip}", style="bold")
+        self.update(content)
+
+    def on_click(self) -> None:
+        """@param: none
+        @return: none
+        @desc: disconnects this client by removing session from local API"""
+        self.network.disconnect("127.0.0.1", self.session_id)
+        self.panel.on_client_disconnected(self.session_id)
+        self.remove()
+
+
+class ConnectedClientsPanel(Vertical):
+    CSS = """
+    ConnectedClientsPanel {
+        width: 100%;
+        height: 100%;
+    }
+    #cc-header {
+        width: 100%;
+        height: auto;
+        text-style: bold;
+        padding: 0 1;
+        border-bottom: solid $primary;
+    }
+    #cc-entries {
+        width: 100%;
+        height: 1fr;
+        overflow-y: auto;
+    }
+    ConnectedClientEntry {
+        height: auto;
+        width: 100%;
+        text-wrap: nowrap;
+        padding: 0 1;
+    }
+    ConnectedClientEntry:hover {
+        background: $error 15%;
+    }
+    """
+
+    def __init__(self, network: Network, **kwargs):
+        """@param network: Network instance for API calls
+        @return: none
+        @desc: initializes ConnectedClientsPanel with network reference"""
+        super().__init__(**kwargs)
+        self.network = network
+        self._header = Static("Connected Clients", id="cc-header")
+        self._entries = VerticalScroll(id="cc-entries")
+
+    def compose(self) -> ComposeResult:
+        """@param: none
+        @return: ComposeResult with header and entry list
+        @desc: composes the connected clients panel layout"""
+        yield self._header
+        yield self._entries
+
+    def add_client(self, session_id: str, from_ip: str):
+        """@param session_id: session identifier
+        @param from_ip: IP address of the connected client
+        @return: none
+        @desc: adds a connected client entry to the panel"""
+        for child in self._entries.children:
+            if isinstance(child, ConnectedClientEntry) and child.session_id == session_id:
+                return
+        self._entries.mount(ConnectedClientEntry(session_id, from_ip, self.network, self))
+        self._update_header()
+
+    def on_client_disconnected(self, session_id: str):
+        """@param session_id: session identifier of the disconnected client
+        @return: none
+        @desc: removes client from list and notifies the app"""
+        self._update_header()
+        app = self.app
+        if hasattr(app, "_on_client_removed"):
+            app._on_client_removed(session_id)
+
+    def _update_header(self):
+        """@param: none
+        @return: none
+        @desc: updates header with connected client count"""
+        count = sum(1 for c in self._entries.children if isinstance(c, ConnectedClientEntry))
+        self._header.update(f"Connected Clients ({count})")
 
 
 class AvailableHosts(Vertical):
@@ -580,6 +701,7 @@ class OpenFileSyncApp(App):
                 yield HorizontalScroll(id="hosts-scroll")
             with Container(id="filesystem"):
                 yield FilesystemPanel(self.network, id="fs-panel")
+                yield ConnectedClientsPanel(self.network, id="cc-panel")
 
         yield Footer()
 
@@ -642,7 +764,7 @@ class OpenFileSyncApp(App):
     def _on_otp_result(self, result: str):
         """@param result: modal dismiss result string
         @return: none
-        @desc: handles OTP modal result and activates filesystem panel for target"""
+        @desc: handles OTP modal result and shows connected clients for target"""
         if result == "verified":
             session_id = self._last_otp_session_id
             from_ip = self._last_otp_from_ip
@@ -652,22 +774,55 @@ class OpenFileSyncApp(App):
                 "role": "target",
             }
             fs = self.query_one("#fs-panel", FilesystemPanel)
-            fs.connect(session_id, "127.0.0.1")
+            fs.display = False
+            cc = self.query_one("#cc-panel", ConnectedClientsPanel)
+            cc.display = True
+            cc.add_client(session_id, from_ip)
 
     def action_kill_connection(self) -> None:
         """@param: none
         @return: none
-        @desc: disconnects active session on both sides and resets filesystem panel"""
+        @desc: disconnects active session on both sides and resets panels"""
         if not self.active_session:
             return
         sid = self.active_session["session_id"]
         remote_ip = self.active_session["remote_ip"]
-        self.network.disconnect(remote_ip, sid)
-        self.network.cancelSession("127.0.0.1", sid)
+        role = self.active_session["role"]
+        if role == "initiator":
+            self.network.disconnect(remote_ip, sid)
+        else:
+            self.network.disconnect("127.0.0.1", sid)
         self.active_session = None
         self._pending_shown.discard(sid)
-        fs = self.query_one("#fs-panel", FilesystemPanel)
-        fs.disconnect()
+        if role == "initiator":
+            fs = self.query_one("#fs-panel", FilesystemPanel)
+            fs.disconnect()
+            fs.display = True
+            cc = self.query_one("#cc-panel", ConnectedClientsPanel)
+            cc.display = False
+        else:
+            cc = self.query_one("#cc-panel", ConnectedClientsPanel)
+            for child in list(cc._entries.children):
+                if isinstance(child, ConnectedClientEntry) and child.session_id == sid:
+                    child.remove()
+            cc._update_header()
+            if not any(isinstance(c, ConnectedClientEntry) for c in cc._entries.children):
+                cc.display = False
+                fs = self.query_one("#fs-panel", FilesystemPanel)
+                fs.display = True
+
+    def _on_client_removed(self, session_id: str):
+        """@param session_id: session identifier of the removed client
+        @return: none
+        @desc: handles client removal and resets state if no clients remain"""
+        self._pending_shown.discard(session_id)
+        if self.active_session and self.active_session["session_id"] == session_id:
+            self.active_session = None
+        cc = self.query_one("#cc-panel", ConnectedClientsPanel)
+        if not any(isinstance(c, ConnectedClientEntry) for c in cc._entries.children):
+            cc.display = False
+            fs = self.query_one("#fs-panel", FilesystemPanel)
+            fs.display = True
 
     def action_scan(self) -> None:
         """@param: none

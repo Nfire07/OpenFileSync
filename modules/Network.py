@@ -157,6 +157,19 @@ class Network:
         except requests.RequestException:
             return {"error": "connection error"}
 
+    def getActiveSessions(self, host_ip: str, target_ip: str):
+        """@param host_ip: IP address of the host to query
+        @param target_ip: IP address to filter sessions by
+        @return: list of active session dicts
+        @desc: fetches verified sessions for a target host"""
+        url = f"http://{host_ip}:{self.app_port}/active-sessions/{target_ip}"
+        try:
+            resp = requests.get(url, timeout=self.timeout)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException:
+            return []
+
     def printNetworkInfo(self):
         """@param: none
         @return: dictionary with network interface information

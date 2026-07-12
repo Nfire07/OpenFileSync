@@ -145,6 +145,21 @@ class OpenFileSyncApi:
                     }
             return {}
 
+        @self.app.get("/active-sessions/{target_ip}")
+        def active_sessions(target_ip: str):
+            """@param target_ip: IP address of the target host
+            @return: list of verified sessions for this target
+            @desc: returns all verified sessions where target_ip matches"""
+            result = []
+            for sid, session in self.sessions.items():
+                if session["target_ip"] == target_ip and session["status"] == "verified":
+                    result.append({
+                        "session_id": sid,
+                        "from_ip": session["from_ip"],
+                        "target_ip": session["target_ip"],
+                    })
+            return result
+
         @self.app.post("/disconnect")
         def disconnect(req: DisconnectRequest):
             """@param req: DisconnectRequest with session_id
