@@ -1,5 +1,6 @@
 AGENTS.md
-./logs/log_errors
-./logs/log_grafic_errors
-./__pycache__
-./.venv
+__pycache__/
+*.pyc
+.venv/
+logs/log_errors
+logs/log_grafic_errors
