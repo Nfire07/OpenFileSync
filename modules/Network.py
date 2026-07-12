@@ -144,6 +144,19 @@ class Network:
         except requests.RequestException:
             return {}
 
+    def getOtpStatus(self, host_ip: str, session_id: str):
+        """@param host_ip: IP address of the host to query
+        @param session_id: unique session identifier
+        @return: dict with session status
+        @desc: checks OTP session status for polling"""
+        url = f"http://{host_ip}:{self.app_port}/otp-status/{session_id}"
+        try:
+            resp = requests.get(url, timeout=self.timeout)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException:
+            return {"error": "connection error"}
+
     def printNetworkInfo(self):
         """@param: none
         @return: dictionary with network interface information

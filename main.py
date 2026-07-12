@@ -93,6 +93,12 @@ class OtpModal(ModalScreen):
         self.from_ip = from_ip
         self.network = network
 
+    def on_mount(self) -> None:
+        """@param: none
+        @return: none
+        @desc: starts polling session status for auto-dismiss"""
+        self.set_interval(1.0, self._poll_session_status)
+
     def compose(self) -> ComposeResult:
         """@param: none
         @return: ComposeResult with modal widgets
@@ -116,6 +122,15 @@ class OtpModal(ModalScreen):
         @return: none
         @desc: cancels this session via local API"""
         self.network.cancelSession("127.0.0.1", self.session_id)
+
+    def _poll_session_status(self):
+        """@param: none
+        @return: none
+        @desc: checks session status and auto-dismisses when verified"""
+        result = self.network.getOtpStatus("127.0.0.1", self.session_id)
+        status = result.get("status")
+        if status == "verified":
+            self.dismiss(result="verified")
 
 
 class ConnectOtpModal(ModalScreen):
@@ -627,8 +642,17 @@ class OpenFileSyncApp(App):
     def _on_otp_result(self, result: str):
         """@param result: modal dismiss result string
         @return: none
-        @desc: handles OTP modal result (only cancel possible)"""
-        pass
+        @desc: handles OTP modal result and activates filesystem panel for target"""
+        if result == "verified":
+            session_id = self._last_otp_session_id
+            from_ip = self._last_otp_from_ip
+            self.active_session = {
+                "session_id": session_id,
+                "remote_ip": from_ip,
+                "role": "target",
+            }
+            fs = self.query_one("#fs-panel", FilesystemPanel)
+            fs.connect(session_id, from_ip)
 
     def action_kill_connection(self) -> None:
         """@param: none
