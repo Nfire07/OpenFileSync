@@ -16,7 +16,6 @@ from modules.Network import Network
 from modules.Api import OpenFileSyncApi
 from modules.Logger import setup_logger, log_exception, log_expected_error, install_global_handler, setup_textual_logger
 import threading
-import requests
 
 
 logger = setup_logger()
@@ -80,16 +79,18 @@ class OtpModal(ModalScreen):
     }
     """
 
-    def __init__(self, session_id: str, otp: int, from_ip: str, **kwargs):
+    def __init__(self, session_id: str, otp: int, from_ip: str, network: Network, **kwargs):
         """@param session_id: unique session identifier
         @param otp: the OTP code to display
         @param from_ip: IP address of the connecting host
+        @param network: Network instance for API calls
         @return: none
         @desc: initializes OtpModal with connection request data"""
         super().__init__(**kwargs)
         self.session_id = session_id
         self.otp = otp
         self.from_ip = from_ip
+        self.network = network
 
     def compose(self) -> ComposeResult:
         """@param: none
@@ -114,15 +115,8 @@ class OtpModal(ModalScreen):
     def _cancel_session(self):
         """@param: none
         @return: none
-        @desc: sends cancel request to API for this session"""
-        try:
-            requests.post(
-                "http://127.0.0.1:8010/cancel",
-                json={"session_id": self.session_id},
-                timeout=2,
-            )
-        except requests.RequestException:
-            pass
+        @desc: cancels this session via local API"""
+        self.network.cancelSession("127.0.0.1", self.session_id)
 
 
 class ConnectOtpModal(ModalScreen):
@@ -176,14 +170,16 @@ class ConnectOtpModal(ModalScreen):
     }
     """
 
-    def __init__(self, session_id: str, target_ip: str, **kwargs):
+    def __init__(self, session_id: str, target_ip: str, network: Network, **kwargs):
         """@param session_id: unique session identifier
         @param target_ip: IP address of the target host
+        @param network: Network instance for API calls
         @return: none
         @desc: initializes ConnectOtpModal with session and target data"""
         super().__init__(**kwargs)
         self.session_id = session_id
         self.target_ip = target_ip
+        self.network = network
 
     def compose(self) -> ComposeResult:
         """@param: none
@@ -218,37 +214,22 @@ class ConnectOtpModal(ModalScreen):
     def _submit_otp(self):
         """@param: none
         @return: none
-        @desc: validates and sends OTP to API for verification"""
+        @desc: validates and sends OTP to target host for verification"""
         otp_text = self.query_one("#otp-input", Input).value.strip()
         if not otp_text or not otp_text.isdigit():
             self.query_one("#connect-status", Static).update("Please enter a valid number")
             return
-        try:
-            resp = requests.post(
-                f"http://127.0.0.1:8010/send-otp",
-                json={"session_id": self.session_id, "otp": int(otp_text)},
-                timeout=2,
-            )
-            data = resp.json()
-            if data.get("verified"):
-                self.dismiss(result="verified")
-            else:
-                self.query_one("#connect-status", Static).update(data.get("error", "Verification failed"))
-        except requests.RequestException:
-            self.query_one("#connect-status", Static).update("Connection error")
+        result = self.network.sendOtp(self.target_ip, self.session_id, int(otp_text))
+        if result.get("verified"):
+            self.dismiss(result="verified")
+        else:
+            self.query_one("#connect-status", Static).update(result.get("error", "Verification failed"))
 
     def _cancel_session(self):
         """@param: none
         @return: none
-        @desc: sends cancel request to API for this session"""
-        try:
-            requests.post(
-                "http://127.0.0.1:8010/cancel",
-                json={"session_id": self.session_id},
-                timeout=2,
-            )
-        except requests.RequestException:
-            pass
+        @desc: cancels this session on the remote host"""
+        self.network.cancelSession(self.target_ip, self.session_id)
 
 
 class HostItem(Static):
@@ -263,7 +244,6 @@ class HostItem(Static):
         self.host_data = host_data
         self.network = network
         self.api_status = "loading"
-        self.api_base = f"http://127.0.0.1:8010"
 
     def on_mount(self) -> None:
         """@param: none
@@ -308,26 +288,19 @@ class HostItem(Static):
     def on_click(self) -> None:
         """@param: none
         @return: none
-        @desc: initiates connection to this host via API and shows OTP input modal"""
+        @desc: initiates connection to remote host and shows OTP input modal"""
         if self.api_status != "active":
             return
         target_ip = (self.host_data.get("ipv4", "") or "").strip()
         if not target_ip:
             return
-        try:
-            resp = requests.post(
-                f"{self.api_base}/connect",
-                json={"target_ip": target_ip, "from_ip": self.client_ip},
-                timeout=2,
-            )
-            data = resp.json()
-            if "session_id" in data:
-                self.app.push_screen(ConnectOtpModal(
-                    session_id=data["session_id"],
-                    target_ip=target_ip,
-                ))
-        except requests.RequestException:
-            pass
+        data = self.network.connect(target_ip, self.client_ip)
+        if "session_id" in data:
+            self.app.push_screen(ConnectOtpModal(
+                session_id=data["session_id"],
+                target_ip=target_ip,
+                network=self.network,
+            ))
 
 
 class AvailableHosts(Vertical):
@@ -398,7 +371,6 @@ class OpenFileSyncApp(App):
         self.network = Network()
         self.network_info = self.network.getNetworkInfo()
         self.host_state = {"status": "loading"}
-        self.api_base = f"http://127.0.0.1:{8010}"
         self._pending_shown = set()
         super().__init__(*args, **kwargs)
 
@@ -455,25 +427,22 @@ class OpenFileSyncApp(App):
     def _poll_pending_connect(self) -> None:
         """@param: none
         @return: none
-        @desc: polls API for pending connection requests directed to this host"""
-        try:
-            resp = requests.get(f"{self.api_base}/pending-connect", timeout=1.5)
-            data = resp.json()
-            if not data or "session_id" not in data:
-                return
-            if data.get("target_ip") != self.network_info["ip"]:
-                return
-            sid = data["session_id"]
-            if sid in self._pending_shown:
-                return
-            self._pending_shown.add(sid)
-            self.push_screen(OtpModal(
-                session_id=sid,
-                otp=data["otp"],
-                from_ip=data["from_ip"],
-            ))
-        except requests.RequestException:
-            pass
+        @desc: polls local API for pending connection requests directed to this host"""
+        data = self.network.getPendingConnect()
+        if not data or "session_id" not in data:
+            return
+        if data.get("target_ip") != self.network_info["ip"]:
+            return
+        sid = data["session_id"]
+        if sid in self._pending_shown:
+            return
+        self._pending_shown.add(sid)
+        self.push_screen(OtpModal(
+            session_id=sid,
+            otp=data["otp"],
+            from_ip=data["from_ip"],
+            network=self.network,
+        ))
 
     def action_scan(self) -> None:
         """@param: none

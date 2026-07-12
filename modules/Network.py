@@ -60,6 +60,58 @@ class Network:
                 "status": "inactive",
             }
 
+    def connect(self, target_ip: str, from_ip: str):
+        """@param target_ip: IP address of the target host
+        @param from_ip: IP address of the local host
+        @return: dict with session_id and otp, or empty dict on failure
+        @desc: initiates connection to remote host and returns session data"""
+        url = f"http://{target_ip}:{self.app_port}/connect"
+        try:
+            resp = requests.post(url, json={"target_ip": target_ip, "from_ip": from_ip}, timeout=self.timeout)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException:
+            return {}
+
+    def sendOtp(self, host_ip: str, session_id: str, otp: int):
+        """@param host_ip: IP address of the host to verify OTP against
+        @param session_id: unique session identifier
+        @param otp: the OTP code to verify
+        @return: dict with verified key and optional error
+        @desc: sends OTP to remote host for verification"""
+        url = f"http://{host_ip}:{self.app_port}/send-otp"
+        try:
+            resp = requests.post(url, json={"session_id": session_id, "otp": otp}, timeout=self.timeout)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException:
+            return {"verified": False, "error": "connection error"}
+
+    def cancelSession(self, host_ip: str, session_id: str):
+        """@param host_ip: IP address of the host owning the session
+        @param session_id: unique session identifier
+        @return: dict with cancelled key
+        @desc: cancels a pending session on remote or local host"""
+        url = f"http://{host_ip}:{self.app_port}/cancel"
+        try:
+            resp = requests.post(url, json={"session_id": session_id}, timeout=self.timeout)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException:
+            return {}
+
+    def getPendingConnect(self):
+        """@param: none
+        @return: dict with session data or empty dict
+        @desc: checks local API for pending connection requests"""
+        url = f"http://127.0.0.1:{self.app_port}/pending-connect"
+        try:
+            resp = requests.get(url, timeout=self.timeout)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException:
+            return {}
+
     def printNetworkInfo(self):
         """@param: none
         @return: dictionary with network interface information
