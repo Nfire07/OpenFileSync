@@ -398,6 +398,7 @@ class FilesystemPanel(Vertical):
         self.session_id = None
         self.remote_ip = None
         self.current_path = None
+        self._pending_path = None
         self._header = Static("Not connected", id="fs-header")
         self._entries = VerticalScroll(id="fs-entries")
 
@@ -437,14 +438,27 @@ class FilesystemPanel(Vertical):
         for child in list(self._entries.children):
             child.remove()
         self._header.update(f"Loading {path or '~'}...")
-        self.run_worker(self._fetch_tree, path, thread=True)
+        self._pending_path = path
+        self.run_worker(self._fetch_tree, path, thread=True, exclusive=True)
 
     def _fetch_tree(self, path: str = None):
         """@param path: directory path to fetch
-        @return: none
+        @return: dict with tree data from remote host
         @desc: fetches tree data from remote host in background thread"""
-        data = self.network.getTree(self.remote_ip, self.session_id, path)
-        self.app.call_from_thread(self._render_tree, data, path)
+        return self.network.getTree(self.remote_ip, self.session_id, path)
+
+    def on_worker_state_changed(self, event) -> None:
+        """@param event: Worker.StateChanged event
+        @return: none
+        @desc: handles worker completion and renders tree data"""
+        if event.worker.is_finished:
+            try:
+                data = event.worker.result
+            except Exception:
+                self._header.update("Error fetching tree")
+                return
+            path = self._pending_path
+            self._render_tree(data, path)
 
     def _render_tree(self, data: dict, path: str = None):
         """@param data: tree dict from API
@@ -460,6 +474,7 @@ class FilesystemPanel(Vertical):
         children = data.get("children", [])
         dirs = [c for c in children if c.get("type") == "directory"]
         files = [c for c in children if c.get("type") == "file"]
+        self._entries.mount(DirectoryEntry({"name": ".", "path": display_path, "type": "directory"}, self.network, self.session_id, self.remote_ip, self))
         if self.current_path and self.current_path != str(Path.home()):
             back = {"name": "..", "path": str(Path(self.current_path).parent), "type": "directory"}
             self._entries.mount(DirectoryEntry(back, self.network, self.session_id, self.remote_ip, self))
