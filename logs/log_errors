@@ -60,3 +60,31 @@ subprocess.CalledProcessError: Command '['sudo', '/home/nfire07/development/Open
 2026-07-11 20:30:38 | INFO     | OpenFileSync | main.py:245 | API server started on port 8010
 2026-07-11 20:31:11 | INFO     | OpenFileSync | main.py:239 | Application starting
 2026-07-11 20:31:11 | INFO     | OpenFileSync | main.py:245 | API server started on port 8010
+2026-07-11 20:43:25 | INFO     | OpenFileSync | main.py:239 | Application starting
+2026-07-11 20:43:25 | INFO     | OpenFileSync | main.py:245 | API server started on port 8010
+2026-07-11 20:46:41 | INFO     | OpenFileSync | main.py:239 | Application starting
+2026-07-11 20:46:41 | INFO     | OpenFileSync | main.py:245 | API server started on port 8010
+2026-07-11 20:49:27 | INFO     | OpenFileSync | main.py:239 | Application starting
+2026-07-11 20:49:27 | INFO     | OpenFileSync | main.py:245 | API server started on port 8010
+2026-07-12 10:44:25 | INFO     | OpenFileSync | main.py:239 | Application starting
+2026-07-12 10:44:25 | INFO     | OpenFileSync | main.py:245 | API server started on port 8010
+2026-07-12 10:46:08 | INFO     | OpenFileSync | main.py:238 | Application starting
+2026-07-12 10:46:08 | INFO     | OpenFileSync | main.py:244 | API server started on port 8010
+2026-07-12 10:46:42 | INFO     | OpenFileSync | main.py:238 | Application starting
+2026-07-12 10:46:42 | INFO     | OpenFileSync | main.py:244 | API server started on port 8010
+2026-07-12 10:53:33 | INFO     | OpenFileSync | main.py:236 | Application starting
+2026-07-12 10:53:33 | INFO     | OpenFileSync | main.py:242 | API server started on port 8010
+2026-07-12 10:54:45 | INFO     | OpenFileSync | main.py:236 | Application starting
+2026-07-12 10:54:45 | INFO     | OpenFileSync | main.py:242 | API server started on port 8010
+2026-07-12 12:13:15 | INFO     | OpenFileSync | main.py:236 | Application starting
+2026-07-12 12:13:15 | INFO     | OpenFileSync | main.py:242 | API server started on port 8010
+2026-07-12 12:14:43 | INFO     | OpenFileSync | main.py:236 | Application starting
+2026-07-12 12:14:43 | INFO     | OpenFileSync | main.py:242 | API server started on port 8010
+2026-07-12 12:25:44 | INFO     | OpenFileSync | main.py:353 | Application starting
+2026-07-12 12:25:44 | INFO     | OpenFileSync | main.py:359 | API server started on port 8010
+2026-07-12 12:25:49 | INFO     | OpenFileSync | main.py:353 | Application starting
+2026-07-12 12:25:49 | INFO     | OpenFileSync | main.py:359 | API server started on port 8010
+2026-07-12 12:26:44 | INFO     | OpenFileSync | main.py:353 | Application starting
+2026-07-12 12:26:44 | INFO     | OpenFileSync | main.py:359 | API server started on port 8010
+2026-07-12 12:27:02 | INFO     | OpenFileSync | main.py:353 | Application starting
+2026-07-12 12:27:02 | INFO     | OpenFileSync | main.py:359 | API server started on port 8010

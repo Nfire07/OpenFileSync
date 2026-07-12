@@ -12,9 +12,7 @@ from modules.KnownHosts import KnownHosts
 from modules.Discovery import Discovery
 from modules.Logger import setup_logger, log_exception, log_expected_error
 
-
 logger = setup_logger()
-
 
 class Network:
     def __init__(self):
@@ -25,24 +23,6 @@ class Network:
         self.discovery = Discovery()
         self.app_port = 8010
         self.timeout = 1.5
-
-    def connect(self, host):
-        """@param host: host to connect to
-        @return: none
-        @desc: placeholder for host connection logic"""
-        pass
-
-    def disconnect(self, host):
-        """@param host: host to disconnect from
-        @return: none
-        @desc: placeholder for host disconnection logic"""
-        pass
-
-    def sync(self, host):
-        """@param host: host to sync with
-        @return: none
-        @desc: placeholder for host synchronization logic"""
-        pass
 
     def getAvailableHosts(self):
         """@param: none

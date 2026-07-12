@@ -1,0 +1,6 @@
+textual
+rich
+fastapi
+uvicorn
+scapy
+requests

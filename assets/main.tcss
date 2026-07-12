@@ -68,3 +68,8 @@ HostItem {
 HostItem Static {
     text-wrap: nowrap;
 }
+
+AvailableHosts {
+    width: 100%;
+    height: 100%;
+}
